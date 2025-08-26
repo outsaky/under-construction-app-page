@@ -3,271 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧩 Puzzle Diário - React</title>
-    <!-- Tailwind CSS via CDN -->
+    <title>🧩 Site em Construção</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style> body { background-color: #111827; } </style>
 </head>
 <body>
     <div id="root"></div>
     
-    <!-- Bibliotecas React -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    
-    <!-- Transpilador Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Seu código React/JSX -->
     <script type="text/babel">
         // ===============================================
-        // CONFIGURAÇÕES DE PERSONALIZAÇÃO
+        // CONFIGURAÇÕES GLOBAIS (sem alterações)
         // ===============================================
-        const SIZE = 4; // Dimensão do puzzle (4x4 = 15 peças + 1 espaço vazio)
-        const SHUFFLE_MOVES = 50; // Quantidade de movimentos no embaralhamento
-        const SOLVE_SPEED = 100; // Velocidade do replay em ms (menor = mais rápido)
-        const GRID_COLS = {
-            3: 'grid-cols-3',
-            4: 'grid-cols-4', 
-            5: 'grid-cols-5'
+        const SIZE = 4;
+        const SHUFFLE_MOVES = 10;
+        const SOLVE_SPEED = 250;
+        const THEME = { piece: "bg-indigo-500 hover:bg-indigo-600" };
+        const DAILY_IMAGES = {
+            1: {
+                landscape: { full: './assets/puzzle-images/image-01-landscape-full.webp', placeholder: './assets/puzzle-images/image-01-landscape-placeholder.webp', ratio: '2400 / 1080' },
+                standard:  { full: './assets/puzzle-images/image-01-standard-full.webp',  placeholder: './assets/puzzle-images/image-01-standard-placeholder.webp',  ratio: '1920 / 1080' },
+                portrait:  { ratio: '1080 / 1350' }
+            },
         };
+        
+        // ===============================================
+        // COMPONENTE DA PEÇA (sem alterações)
+        // ===============================================
+        const PuzzlePiece = React.memo(({ val, onClick, image, placeholder, isLoaded, imageError, size }) => {
+            const hasImage = image && val && !imageError;
+            const style = hasImage ? { backgroundImage: `url(${isLoaded ? image : placeholder})`, backgroundSize: `${size * 100}% ${size * 100}%`, backgroundPosition: `${((val - 1) % size) * -100}% ${Math.floor((val - 1) / size) * -100}%`, } : {};
+            return ( <div onClick={onClick} className={`flex items-center justify-center cursor-pointer select-none shadow-md transition-all duration-300 ${!val ? 'bg-gray-900/50' : ''} ${val && !hasImage ? THEME.piece : ''} ${hasImage ? (isLoaded ? 'opacity-100' : 'opacity-70 blur-sm') : ''}`} style={style}> {val && !hasImage && (<span className="text-xl font-bold text-white drop-shadow-lg">{val}</span>)} </div> );
+        });
 
-        // Cores do tema (personalizáveis)
-        const THEME = {
-            background: "bg-gray-900", // Fundo da página
-            title: "text-white", // Cor do título
-            board: "bg-gray-700", // Fundo do tabuleiro
-            piece: "bg-indigo-500 hover:bg-indigo-600", // Cor das peças (quando sem imagem)
-            empty: "bg-gray-900", // Cor do espaço vazio
-            button: "bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-500", // Classes do botão
-        };
-
-        // Dimensões das peças (personalizáveis)
-        const PIECE_SIZE = {
-            mobile: "w-16 h-16", // Tamanho em mobile
-            desktop: "md:w-20 md:h-20", // Tamanho em desktop
-            gap: "gap-1", // Espaçamento entre peças
-            padding: "p-2", // Padding interno do tabuleiro
-            radius: "rounded-xl", // Raio das bordas das peças
-            boardRadius: "rounded-2xl", // Raio das bordas do tabuleiro
-        };
-
-        // Componente principal do puzzle
+        // ===============================================
+        // COMPONENTE PRINCIPAL DA APLICAÇÃO
+        // ===============================================
         function PuzzlePage() {
-            // ===============================================
-            // ESTADOS DO COMPONENTE
-            // ===============================================
             const [board, setBoard] = React.useState([]);
-            const [empty, setEmpty] = React.useState({ row: SIZE - 1, col: SIZE - 1 });
+            const [empty, setEmpty] = React.useState({ r: SIZE - 1, c: SIZE - 1 });
             const [history, setHistory] = React.useState([]);
             const [userMoves, setUserMoves] = React.useState([]);
-            const [dailyImage, setDailyImage] = React.useState(null);
-            const [imageLoaded, setImageLoaded] = React.useState(false);
-            const [useNumbers, setUseNumbers] = React.useState(true); // Começa true até a imagem carregar
 
-            // ===============================================
-            // HOOK: CARREGAR IMAGEM LOCAL
-            // ===============================================
-            React.useEffect(() => {
-                loadLocalImage();
-            }, []);
-
-            async function loadLocalImage() {
-                try {
-                    // **IMPORTANTE**: Certifique-se que este caminho está correto
-                    // em relação ao seu arquivo HTML.
-                    const imagePath = './assets/puzzle-images/image-tree.jpg';
-                    
-                    const img = new Image();
-                    img.onload = () => {
-                        setDailyImage(imagePath);
-                        setImageLoaded(true);
-                        setUseNumbers(false); // Sucesso: desativa o fallback de números
-                    };
-                    img.onerror = () => {
-                        console.error(`Imagem em ${imagePath} não encontrada ou falhou ao carregar. Usando números.`);
-                        setImageLoaded(true); // Finaliza o carregamento (com falha)
-                        setUseNumbers(true); // Mantém o fallback de números
-                    };
-                    img.src = imagePath;
-                } catch (error) {
-                    console.error('Erro no bloco de carregamento de imagem:', error);
-                    setImageLoaded(true);
-                    setUseNumbers(true);
-                }
-            }
-
-            // ===============================================
-            // INICIALIZAÇÃO E EMBARALHAMENTO
-            // (Sem alterações aqui)
-            // ===============================================
-            React.useEffect(() => {
-                const solved = Array.from({ length: SIZE }, (_, r) => 
-                    Array.from({ length: SIZE }, (_, c) => {
-                        if (r === SIZE - 1 && c === SIZE - 1) return null;
-                        return r * SIZE + c + 1;
-                    })
-                );
-                setBoard(solved);
-                shuffleBoard(solved);
-            }, []);
-
-            function shuffleBoard(startBoard) {
-                let tempBoard = JSON.parse(JSON.stringify(startBoard));
-                let tempEmpty = { row: SIZE - 1, col: SIZE - 1 };
-                let moves = [];
-                const directions = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
-
-                for (let i = 0; i < SHUFFLE_MOVES; i++) {
-                    const validMoves = directions.filter(({ dr, dc }) => {
-                        const newRow = tempEmpty.row + dr;
-                        const newCol = tempEmpty.col + dc;
-                        return newRow >= 0 && newRow < SIZE && newCol >= 0 && newCol < SIZE;
-                    });
-                    const move = validMoves[Math.floor(Math.random() * validMoves.length)];
-                    const newRow = tempEmpty.row + move.dr;
-                    const newCol = tempEmpty.col + move.dc;
-                    const pieceValue = tempBoard[newRow][newCol];
-                    moves.push({ piece: pieceValue, from: { row: newRow, col: newCol }, to: { row: tempEmpty.row, col: tempEmpty.col } });
-                    tempBoard[tempEmpty.row][tempEmpty.col] = tempBoard[newRow][newCol];
-                    tempBoard[newRow][newCol] = null;
-                    tempEmpty = { row: newRow, col: newCol };
-                }
-                
-                setBoard(tempBoard);
-                setEmpty(tempEmpty);
-                setHistory(moves);
-                setUserMoves([]);
-            }
-
-            // ===============================================
-            // LÓGICA DE MOVIMENTO E RESOLUÇÃO
-            // (Sem alterações aqui)
-            // ===============================================
-            function movePiece(row, col) {
-                const isValidMove = 
-                    (Math.abs(row - empty.row) === 1 && col === empty.col) ||
-                    (Math.abs(col - empty.col) === 1 && row === empty.row);
-
-                if (isValidMove) {
-                    const newBoard = JSON.parse(JSON.stringify(board));
-                    const pieceValue = newBoard[row][col];
-                    const userMove = { piece: pieceValue, from: { row, col }, to: { row: empty.row, col: empty.col } };
-                    
-                    newBoard[empty.row][empty.col] = newBoard[row][col];
-                    newBoard[row][col] = null;
-                    
-                    setBoard(newBoard);
-                    setEmpty({ row, col });
-                    setUserMoves(prev => [...prev, userMove]);
-                }
-            }
-
-            async function solvePuzzle() {
-                let tempBoard = JSON.parse(JSON.stringify(board));
-                let tempEmpty = { ...empty };
-
-                const allMoves = [...userMoves].reverse().concat([...history].reverse());
-
-                for (const move of allMoves) {
-                    await new Promise(resolve => setTimeout(resolve, SOLVE_SPEED));
-                     // O movimento reverso é trocar a peça com o espaço vazio
-                    tempBoard[move.from.row][move.from.col] = move.piece;
-                    tempBoard[move.to.row][move.to.col] = null;
-                    tempEmpty = { row: move.to.row, col: move.to.col };
-                    setBoard(JSON.parse(JSON.stringify(tempBoard)));
-                    setEmpty({ ...tempEmpty });
-                }
-                setUserMoves([]);
-            }
+            const [activeImageSet, setActiveImageSet] = React.useState(null);
+            const [placeholder, setPlaceholder] = React.useState(null);
+            const [fullImage, setFullImage] = React.useState(null);
+            const [isLoaded, setIsLoaded] = React.useState(false);
+            const [imageError, setImageError] = React.useState(false);
             
-            // ===============================================
-            // CÁLCULO DO ESTILO DA IMAGEM
-            // ===============================================
-            function getPieceImageStyle(value) {
-                // Não aplica estilo se a imagem não estiver pronta, se for fallback, ou se for o espaço vazio
-                if (useNumbers || !dailyImage || !imageLoaded || !value) {
-                    return {};
+            const [isPuzzleComplete, setIsPuzzleComplete] = React.useState(false);
+            const [notification, setNotification] = React.useState('');
+            const [isSolving, setIsSolving] = React.useState(false);
+
+            // --- NOVO: Estado para rastrear o gatilho da solução ---
+            const [solutionTriggeredByButton, setSolutionTriggeredByButton] = React.useState(false);
+
+            // --- Lógica de seleção e carregamento de imagem (sem alterações) ---
+            React.useEffect(() => {
+                const selectImageSet = () => { const aspectRatio = window.innerWidth / window.innerHeight; const imageSets = DAILY_IMAGES[1]; if (aspectRatio > 1.8) setActiveImageSet(imageSets.landscape); else if (aspectRatio < 1.1) setActiveImageSet(imageSets.portrait); else setActiveImageSet(imageSets.standard); };
+                selectImageSet(); window.addEventListener('resize', selectImageSet);
+                return () => window.removeEventListener('resize', selectImageSet);
+            }, []);
+
+            React.useEffect(() => {
+                if (!activeImageSet || !activeImageSet.full) { setImageError(true); return; }
+                setIsLoaded(false); setPlaceholder(null); setFullImage(null); setImageError(false);
+                const pImg = new Image(); pImg.src = activeImageSet.placeholder;
+                pImg.onload = () => { setPlaceholder(activeImageSet.placeholder); const fImg = new Image(); fImg.src = activeImageSet.full; fImg.onload = () => { setFullImage(activeImageSet.full); setTimeout(() => setIsLoaded(true), 100); }; fImg.onerror = () => { console.error("Falha ao carregar imagem principal."); setImageError(true); }; };
+                pImg.onerror = () => { console.error("Falha ao carregar imagem placeholder."); setImageError(true); };
+            }, [activeImageSet]);
+            
+            // --- Funções de lógica do jogo ---
+            const isSolved = (currentBoard) => { /* ...lógica inalterada... */ 
+                if (!currentBoard || currentBoard.length === 0) return false; let expectedVal = 1;
+                for (let r = 0; r < SIZE; r++) { for (let c = 0; c < SIZE; c++) {
+                    if (r === SIZE - 1 && c === SIZE - 1) { if (currentBoard[r][c] !== null) return false; } 
+                    else { if (currentBoard[r][c] !== expectedVal) return false; expectedVal++; }
+                } } return true;
+            };
+
+            const shuffleBoard = React.useCallback(() => {
+                setIsPuzzleComplete(false);
+                setSolutionTriggeredByButton(false); // NOVO: Reseta o gatilho para o novo jogo
+                const solved = Array.from({ length: SIZE }, (_, r) => Array.from({ length: SIZE }, (_, c) => (r === SIZE - 1 && c === SIZE - 1) ? null : r * SIZE + c + 1));
+                let b = JSON.parse(JSON.stringify(solved)); let e = { r: SIZE - 1, c: SIZE - 1 }; let h = [];
+                const dirs = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
+                for (let i = 0; i < SHUFFLE_MOVES; i++) {
+                    const validMoves = dirs.filter(({ dr, dc }) => { const nR = e.r + dr, nC = e.c + dc; return nR >= 0 && nR < SIZE && nC >= 0 && nC < SIZE; });
+                    const move = validMoves[Math.floor(Math.random() * validMoves.length)]; const nR = e.r + move.dr, nC = e.c + move.dc;
+                    h.push({ val: b[nR][nC], from: { r: nR, c: nC }, to: { r: e.r, c: e.c } });
+                    b[e.r][e.c] = b[nR][nC]; b[nR][nC] = null; e = { r: nR, c: nC };
                 }
-                
-                // Calcula a posição original da peça para saber qual parte da imagem mostrar
-                const targetRow = Math.floor((value - 1) / SIZE);
-                const targetCol = (value - 1) % SIZE;
-                
-                return {
-                    backgroundImage: `url(${dailyImage})`,
-                    backgroundSize: `${SIZE * 100}% ${SIZE * 100}%`,
-                    backgroundPosition: `${targetCol * -100}% ${targetRow * -100}%`,
-                };
-            }
+                setBoard(b); setEmpty(e); setHistory(h); setUserMoves([]);
+            }, []);
 
-            // ===============================================
-            // RENDERIZAÇÃO DO COMPONENTE
-            // ===============================================
+            React.useEffect(() => { shuffleBoard(); }, [shuffleBoard, activeImageSet]);
+
+            const movePiece = React.useCallback((r, c) => {
+                if (isSolving || isPuzzleComplete) return;
+                if ((Math.abs(r - empty.r) === 1 && c === empty.c) || (Math.abs(c - empty.c) === 1 && r === empty.r)) {
+                    const newBoard = JSON.parse(JSON.stringify(board)); const val = newBoard[r][c];
+                    setUserMoves(prev => [...prev, { val, from: { r, c }, to: { r: empty.r, c: empty.c } }]);
+                    newBoard[empty.r][empty.c] = val; newBoard[r][c] = null;
+                    setBoard(newBoard); setEmpty({ r, c });
+                }
+            }, [board, empty, isSolving, isPuzzleComplete]);
+
+            const solvePuzzle = React.useCallback(async () => {
+                setIsSolving(true);
+                let b = JSON.parse(JSON.stringify(board)); let e = { ...empty };
+                const allMoves = [...userMoves].reverse().concat([...history].reverse());
+                for (const move of allMoves) {
+                    await new Promise(res => setTimeout(res, SOLVE_SPEED));
+                    b[move.from.r][move.from.c] = move.val; b[move.to.r][move.to.c] = null;
+                    e = { r: move.to.r, c: move.to.c };
+                    setBoard(JSON.parse(JSON.stringify(b))); setEmpty({ ...e });
+                }
+                setUserMoves([]);
+                setIsSolving(false);
+            }, [board, empty, history, userMoves]);
+
+            React.useEffect(() => {
+                if (board.length > 0 && !isPuzzleComplete) {
+                    if (isSolved(board)) {
+                        setIsPuzzleComplete(true);
+                        setHistory([]);
+                        setUserMoves([]);
+                        
+                        // --- NOVO: Lógica da mensagem condicional ---
+                        if (solutionTriggeredByButton) {
+                            setNotification('Parabéns, você resolveu!... mesmo que seja apertando o botão 😉');
+                        } else {
+                            setNotification('Parabéns, você resolveu!');
+                        }
+                        
+                        setTimeout(() => setNotification(''), 4000);
+                    }
+                }
+            }, [board, isPuzzleComplete, solutionTriggeredByButton]);
+
+            const handleSolveClick = () => {
+                if (isPuzzleComplete) {
+                    setNotification('Está querendo me enganar? Já está tudo em ordem!');
+                    setTimeout(() => setNotification(''), 3000);
+                } else {
+                    setSolutionTriggeredByButton(true); // NOVO: Marca que a solução foi iniciada pelo botão
+                    solvePuzzle();
+                }
+            };
+            
+            const canSolve = placeholder || imageError;
+
             return (
-                <div className={`min-h-screen flex flex-col items-center justify-center ${THEME.background} ${THEME.title} p-6`}>
-                    <h1 className="text-3xl font-bold mb-6">🧩 Puzzle da Árvore</h1>
-                    
-                    <div className="mb-2 text-sm text-gray-400">
-                        Status: {imageLoaded ? (useNumbers ? 'Falha ao carregar imagem, usando números.' : 'Imagem carregada!') : 'Carregando imagem...'}
-                    </div>
-                    
-                    <div className={`grid ${GRID_COLS[SIZE]} ${PIECE_SIZE.gap} ${THEME.board} ${PIECE_SIZE.padding} ${PIECE_SIZE.boardRadius} shadow-lg`}>
-                        {board.flat().map((val, index) => {
-                            const r = Math.floor(index / SIZE);
-                            const c = index % SIZE;
-                            
-                            const pieceStyle = getPieceImageStyle(val);
-                            const hasImage = Object.keys(pieceStyle).length > 0;
-
-                            return (
-                                <div
-                                    key={val === null ? 'empty-piece' : val}
-                                    onClick={() => movePiece(r, c)}
-                                    // **LÓGICA CORRIGIDA AQUI**
-                                    className={`
-                                        flex items-center justify-center 
-                                        ${PIECE_SIZE.mobile} ${PIECE_SIZE.desktop} 
-                                        ${PIECE_SIZE.radius} cursor-pointer select-none shadow-md
-                                        transition-all duration-150
-                                        ${!val ? THEME.empty : (hasImage ? '' : THEME.piece)}
-                                    `}
-                                    // **APLICAÇÃO DIRETA DO ESTILO AQUI**
-                                    style={pieceStyle}
-                                >
-                                    {/* Mostra o número apenas se for o modo fallback e não for o espaço vazio */}
-                                    {val && !hasImage && (
-                                        <span className="text-xl font-bold text-white drop-shadow-lg">
-                                            {val}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
+                <main className="min-h-screen w-full bg-gray-900 flex flex-col items-center justify-center p-4 md:p-6 lg:p-8 relative">
+                    <div className="w-full max-w-[2400px] flex items-center justify-between mb-4 h-16 md:h-24">
+                        {fullImage && !imageError && (<img src={fullImage} alt="Preview" className="h-full w-auto rounded-md shadow-lg border-2 border-gray-600 transition-opacity duration-500" style={{ aspectRatio: activeImageSet?.ratio, opacity: isLoaded ? 1 : 0 }}/>)}
+                        <button onClick={isPuzzleComplete ? shuffleBoard : handleSolveClick} disabled={!canSolve && !isPuzzleComplete} className="text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed font-bold py-2 px-4 rounded-lg shadow-md transition-all w-48 text-center">
+                            {isPuzzleComplete ? 'Embaralhar de Novo?' : (isSolving ? 'Resolvendo...' : 'Resolver')}
+                        </button>
                     </div>
 
-                    <button 
-                        onClick={solvePuzzle} 
-                        className={`mt-6 text-lg px-6 py-2 ${PIECE_SIZE.radius} text-white font-medium transition-colors ${THEME.button}`}
-                        disabled={!imageLoaded}
-                    >
-                        {!imageLoaded ? 'Carregando...' : 'Resolver'}
-                    </button>
+                    <div className="w-full h-auto shadow-2xl" style={{ aspectRatio: activeImageSet?.ratio, maxWidth: '2400px', maxHeight: 'calc(100vh - 120px)' }}>
+                        {(placeholder || imageError) && (
+                             <div className="w-full h-full grid grid-cols-4 grid-rows-4 gap-1 p-1 bg-gray-700/80 rounded-lg">
+                                {board.flat().map((val, index) => {
+                                    const r = Math.floor(index / SIZE);
+                                    const c = index % SIZE;
+                                    return (<PuzzlePiece key={val === null ? 'empty' : val} val={val} onClick={() => movePiece(r, c)} image={fullImage} placeholder={placeholder} isLoaded={isLoaded} imageError={imageError} size={SIZE}/>);
+                                })}
+                            </div>
+                        )}
+                    </div>
 
-                    {dailyImage && imageLoaded && !useNumbers && (
-                        <div className="mt-4 text-center">
-                            <p className="text-sm text-gray-400 mb-2">Imagem completa:</p>
-                            <img 
-                                src={dailyImage} 
-                                alt="Imagem completa do puzzle" 
-                                className="w-32 h-32 object-cover rounded-lg opacity-70 hover:opacity-100 transition-opacity cursor-pointer border border-gray-600"
-                            />
+                    {notification && (
+                        <div className="fixed bottom-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-xl transition-opacity duration-300">
+                            {notification}
                         </div>
                     )}
-                </div>
+                </main>
             );
         }
 
-        // Renderização da aplicação
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<PuzzlePage />);
